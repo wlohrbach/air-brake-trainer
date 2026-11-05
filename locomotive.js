@@ -127,7 +127,7 @@ function build() {
   built = n;
   const width = (n - 1) * 640 + 600;
   svg.setAttribute("viewBox", `0 0 ${width} 600`);
-  svg.style.minWidth = Math.min(900 * n / 2, 1800) + "px";
+  svg.style.minWidth = n > 3 ? n * 420 + "px" : "0";
   pipes = [];
   for (let k = 0; k < n; k++) pipes.push(...unitPipes(k));
   const end = OX(n - 1) + 560;
@@ -196,7 +196,6 @@ function buildCar() {
   carCount = view.units.length;
   if (!view.units[carUnit] || view.units[carUnit].loco) carUnit = cars.length ? cars[0].index : -1;
   $("carPick").innerHTML = cars.map((u, i) => `<option value="${u.index}"${u.index === carUnit ? " selected" : ""}>${i + 1} · ${esc(u.id)} · ${esc(u.kind)}</option>`).join("");
-  $("carBoard").hidden = carUnit < 0;
   if (carUnit < 0) return;
   // Air moves where the valve lets it: from the higher pressure to the lower, as fast as the difference allows.
   const d = (a, b) => Math.max(-20, Math.min(20, (a - b) * 3));
@@ -235,7 +234,8 @@ function buildCar() {
   g.push(`<rect class="box" x="380" y="96" width="80" height="44" rx="4"/><text class="ts" x="388" y="113">emergency</text><text class="ts" x="388" y="126">portion</text>`);
   g.push(`<text class="ts" x="370" y="160" text-anchor="middle">pipe bracket</text><text class="tv" x="370" y="174" text-anchor="middle" id="cState"></text>`);
   // retaining valve and emergency vent
-  g.push(`<rect class="box" x="160" y="26" width="80" height="28" rx="4"/><text class="ts" x="168" y="44">retaining valve</text><text class="tv" x="160" y="68" id="cRet"></text><text class="ts" x="146" y="44" text-anchor="end">EX</text>`);
+  g.push(`<g class="click" id="cRetBtn" tabindex="0" role="button" aria-label="Retaining valve handle"><title>Retaining valve: click to turn the handle (EX, HP, LP, SD)</title>` +
+    `<rect class="box" x="150" y="26" width="90" height="28" rx="4"/><text class="ts" x="158" y="44">retaining valve</text><text class="tv" x="150" y="68" id="cRet"></text></g><text class="ts" x="136" y="44" text-anchor="end">EX</text>`);
   g.push(`<text class="ts" x="478" y="36">vent valve</text><text class="ts" x="478" y="48">(emergency) EX</text>`);
   // combined reservoir
   g.push(`<rect class="box" x="560" y="80" width="340" height="100" rx="46"/><line x1="730" y1="82" x2="730" y2="178" stroke="#7a858e" stroke-width="1.3"/>`);
@@ -247,6 +247,7 @@ function buildCar() {
   g.push(`<rect class="box" x="80" y="100" width="120" height="50" rx="5"/><text class="t" x="88" y="92">Brake cylinder</text><text class="tv" x="90" y="130" id="cBc"></text>`);
   g.push(`<text class="ts" x="80" y="168" id="cTravel"></text><text class="ts" x="80" y="182" id="cBrake"></text>`);
   $("carSchem").innerHTML = g.join("");
+  bind("cRetBtn", nextRetainer);
   const groups = $("carSchem").querySelectorAll(":scope > g:not([id])");
   carPipes.forEach((p, i) => { p.fillEl = groups[i].querySelector(".fill"); p.dashEl = groups[i].querySelector(".dash"); });
 }
@@ -284,6 +285,27 @@ function animateCar(dt, run) {
   }
 }
 $("carPick").onchange = () => { carUnit = +$("carPick").value; carCount = -1; renderCar(); };
+// The retaining valve handle turns EX -> HP -> LP -> SD -> EX, as a carman sets it.
+const RETAINER_NEXT = { Exhaust: ["HighPressure", 1], HighPressure: ["LowPressure", 2], LowPressure: ["SlowDirect", 3], SlowDirect: ["Exhaust", 0] };
+function nextRetainer() {
+  const [, value] = RETAINER_NEXT[CU().retainer] ?? RETAINER_NEXT.SlowDirect;
+  post("fault", value ? { type: "retainer", unit: carUnit, value, on: true } : { type: "retainer", unit: carUnit, on: false });
+}
+
+// ---- views ----------------------------------------------------------------------------------------------------
+
+const HINTS = {
+  viewLoco: "Pipes fill as they charge; dashes show which way the air moves. Click a cock, an MU-2A valve or an MU hose to work it.",
+  viewCar: "Click the retaining valve to turn its handle. Other car faults are set on the Brake Pipe Propagation Simulator.",
+  viewConsist: "Each unit's crew settings. Adding or taking off a unit starts the same train again.",
+};
+function showView(id) {
+  for (const b of $("tabs").querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === id);
+  for (const v of Object.keys(HINTS)) $(v).hidden = v !== id;
+  $("hint").textContent = HINTS[id];
+}
+for (const b of $("tabs").querySelectorAll("button")) b.onclick = () => showView(b.dataset.v);
+showView("viewLoco");
 
 // ---- consist controls ---------------------------------------------------------------------------------------
 
@@ -411,8 +433,7 @@ function narrate() {
 function render() {
   const v = view;
   const has = v && v.locomotives && v.locomotives.length > 0;
-  $("noTrain").hidden = !!has; $("board").hidden = !has; $("carBoard").hidden = !has;
-  document.querySelector(".grid3").hidden = !has;
+  $("noTrain").hidden = !!has; $("rack").hidden = !has;
   $("status").textContent = !v ? "Not running" : v.paused ? "Paused" : `Running ${v.speedFactor}x`;
   if (!has) return;
   if (built !== v.locomotives.length) { build(); carCount = -1; }
