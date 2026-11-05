@@ -189,6 +189,7 @@ const RETAINER = { Exhaust: "EX - exhaust", HighPressure: "HP - holds 20 psi", L
 let carUnit = -1, carCount = -1, carPipes = [];
 const CU = () => view.units[carUnit];
 const unitBefore = () => view.units[carUnit - 1];
+const unitAfter = () => view.units[carUnit + 1];
 function carPipe(sys, pts, net, flow, full = 90) { return { sys, pts, net, flow, full, off: 0 }; }
 function buildCar() {
   const cars = view.units.filter(u => !u.loco);
@@ -201,7 +202,10 @@ function buildCar() {
   const d = (a, b) => Math.max(-20, Math.min(20, (a - b) * 3));
   const st = () => CU().valve, rel = () => st() === "Release", app = () => st() === "Service" || st() === "Emergency";
   carPipes = [
-    carPipe("bp", [[20, 290], [940, 290]], () => CU().brakePipePsi, null),
+    // Beyond each angle cock the hose belongs to the next car's brake pipe, so it shows that car's pressure.
+    carPipe("bp", [[20, 290], [48, 290]], () => (unitBefore() ?? CU()).brakePipePsi, null),
+    carPipe("bp", [[72, 290], [888, 290]], () => CU().brakePipePsi, null),
+    carPipe("bp", [[912, 290], [940, 290]], () => (unitAfter() ?? CU()).brakePipePsi, null),
     carPipe("bp", [[330, 290], [330, 268]], () => CU().brakePipePsi, () => rel() ? Math.max(0, d(CU().brakePipePsi, CU().auxPsi)) : 0),
     carPipe("bp", [[330, 252], [330, 240]], () => CU().cutOut ? 0 : CU().brakePipePsi, () => rel() ? Math.max(0, d(CU().brakePipePsi, CU().auxPsi)) : 0),
     carPipe("bp", [[330, 215], [330, 180]], () => CU().cutOut ? 0 : CU().brakePipePsi, () => rel() ? Math.max(0, d(CU().brakePipePsi, CU().auxPsi)) : 0),
@@ -220,9 +224,9 @@ function buildCar() {
       (p.sys === "ex" ? "" : `<path class="fill" d="${dd}" stroke="var(--${p.sys})"/>`) + (p.flow ? `<path class="dash" d="${dd}"/>` : "") + "</g>");
   }
   // angle cocks, hoses, branch pipe fittings
-  g.push(carCock("cacF", 60, 290, "Angle cock, A end"), carCock("cacR", 900, 290, "Angle cock, B end"), carCock("ccut", 330, 260, "Branch pipe cut-out cock"));
+  g.push(carCock("cacF", 60, 290, "Angle cock, A end", true), carCock("cacR", 900, 290, "Angle cock, B end", true), carCock("ccut", 330, 260, "Branch pipe cut-out cock"));
   g.push(`<text class="ts" x="60" y="316" text-anchor="middle">A end angle cock</text><text class="ts" x="900" y="316" text-anchor="middle">B end angle cock</text>`);
-  g.push(`<text class="ts" x="20" y="270">← car ahead</text><text class="ts" x="940" y="270" text-anchor="end">car behind →</text>`);
+  g.push(`<text class="ts" x="20" y="270" id="cAhead"></text><text class="ts" x="940" y="270" text-anchor="end" id="cBehind"></text>`);
   g.push(`<text class="ts" x="342" y="264">cut-out cock</text><text class="tv" x="600" y="282" id="cBp"></text><text class="ts" x="540" y="282" text-anchor="end">Brake pipe</text>`);
   g.push(`<rect class="box" x="306" y="215" width="48" height="25" rx="4"/><text class="ts" x="362" y="226">combined dirt</text><text class="ts" x="362" y="238">collector</text>`);
   // control valve on its pipe bracket
@@ -246,9 +250,12 @@ function buildCar() {
   const groups = $("carSchem").querySelectorAll(":scope > g:not([id])");
   carPipes.forEach((p, i) => { p.fillEl = groups[i].querySelector(".fill"); p.dashEl = groups[i].querySelector(".dash"); });
 }
-function carCock(id, x, y, label) {
+// The handle lies along the pipe when the cock is open and across it when closed; cock() turns it 90° to open, so a cock
+// on a horizontal pipe starts from a vertical handle.
+function carCock(id, x, y, label, horizontalPipe = false) {
+  const [dx, dy] = horizontalPipe ? [0, 12] : [12, 0];
   return `<g id="${id}"><title>${label}</title><circle class="ring" cx="${x}" cy="${y}" r="7.5"/>` +
-    `<line class="cockh hdl" x1="${x - 12}" y1="${y}" x2="${x + 12}" y2="${y}" style="transform-origin:${x}px ${y}px"/></g>`;
+    `<line class="cockh hdl" x1="${x - dx}" y1="${y - dy}" x2="${x + dx}" y2="${y + dy}" style="transform-origin:${x}px ${y}px"/></g>`;
 }
 function renderCar() {
   if (carCount !== view.units.length) buildCar();
@@ -263,6 +270,9 @@ function renderCar() {
   $("cBrake").textContent = u.sticking ? "sticking brake" : u.cylinderLeakScfm > 0 ? "cylinder leaking" : "";
   $("cRod").setAttribute("x2", 74 - (u.pistonOut ? Math.min(14, u.pistonTravelIn) * 3.2 : 4));
   cock("ccut", !u.cutOut);
+  const behind = unitAfter();
+  $("cAhead").textContent = ahead ? `← ${ahead.loco ? "locomotive" : "car ahead"} ${r(ahead.brakePipePsi)} psi` : "← front of train";
+  $("cBehind").textContent = behind ? `car behind ${r(behind.brakePipePsi)} psi →` : "end of train (EOT) →";
   cock("cacF", !(ahead && ahead.angleCockBehindClosed));
   cock("cacR", !u.angleCockBehindClosed);
 }
