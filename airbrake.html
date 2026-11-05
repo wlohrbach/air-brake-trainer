@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Brake Pipe Propagation Simulator</title>
+<link rel="stylesheet" href="site.css">
+<style>
+  :root { --pipe:#4fc3f7; --aux:#81c784; --emg:#b38be8; --cyl:#ffa726; }
+  .strip { display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:6px 12px; min-width:88px; }
+  .tile .k { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .tile .v { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .tile .v small { font-size:12px; color:var(--dim); font-weight:400; }
+  .tile.alarm { border-color:var(--bad); } .tile.alarm .v { color:var(--bad); }
+  .tile.warnt { border-color:var(--warn); } .tile.warnt .v { color:var(--warn); }
+  main { display:grid; grid-template-columns: 1fr 380px; gap:10px; padding:10px 16px; }
+  .col { display:flex; flex-direction:column; gap:10px; min-width:0; }
+  h2 { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin:0 0 8px; font-weight:600; }
+  canvas { width:100%; display:block; background:var(--panel); border:1px solid var(--line); border-radius:6px; }
+  #graph { height:300px; } #cars { height:74px; cursor:pointer; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--dim); margin-top:6px; flex-wrap:wrap; }
+  .legend i { display:inline-block; width:12px; height:3px; vertical-align:middle; margin-right:5px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .row + .row { margin-top:8px; }
+  .row label { flex-direction:row; align-items:center; gap:6px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .grid2 > * { min-width:0; } .grid2 select { width:100%; }
+  input[type=number] { width:100%; } input[type=range] { flex:1; min-width:140px; }
+  .pos button { min-width:64px; } .pos button.on, button.on { background:#1d4f6b; border-color:#2a6d93; color:#fff; }
+  .log { max-height:140px; overflow:auto; font-size:12px; color:#bbb; } .log div { border-top:1px solid var(--line); padding:3px 0; }
+  .step h3 { margin:2px 0 6px; font-size:16px; } .step .instr { font-size:14px; line-height:1.45; }
+  .explain { margin-top:8px; background:#202a30; border:1px solid #2d3c45; border-radius:5px; padding:8px 10px; font-size:13px; line-height:1.45; }
+  .checks { margin:8px 0 0; padding:0; list-style:none; font-size:13px; } .checks li::before { content:"○ "; color:var(--dim); } .checks li.met::before { content:"● "; color:var(--good); }
+  .fb { margin-top:8px; font-size:13px; } .fb.good { color:var(--good); } .fb.bad { color:var(--warn); }
+  .walk { display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:4px; max-height:220px; overflow:auto; margin-top:8px; }
+  .walk button { padding:4px 2px; font-size:11px; } .walk button.seen { border-color:#2a6d93; } .walk button.marked { background:#4a3a14; border-color:var(--warn); }
+  .obs { margin-top:8px; font-size:13px; } .obs .marks { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .progress { color:var(--dim); font-size:12px; }
+  .result td, .result th { padding:4px 6px; font-size:12px; }
+  .big { font-size:40px; font-weight:700; }
+  @media (max-width: 1000px) { main { grid-template-columns:1fr; } }
+</style>
+</head>
+<body data-feature="instruction">
+<header class="top"><h1>Brake Pipe Propagation Simulator</h1><span id="status" class="muted">Not running</span><div id="userbar"></div></header>
+
+<div class="strip">
+  <div class="tile"><div class="k">Main res</div><div class="v" id="mr">--</div></div>
+  <div class="tile"><div class="k">Equalizing</div><div class="v" id="er">--</div></div>
+  <div class="tile"><div class="k">Brake pipe</div><div class="v" id="bp">--</div></div>
+  <div class="tile"><div class="k">Brake cyl</div><div class="v" id="bc">--</div></div>
+  <div class="tile"><div class="k">Air flow</div><div class="v" id="flow">--</div></div>
+  <div class="tile" id="eotTile"><div class="k">EOT</div><div class="v" id="eot">--</div></div>
+  <div class="tile"><div class="k">Automatic</div><div class="v" id="auto" style="font-size:16px">--</div></div>
+  <div class="tile" id="cutTile"><div class="k">Brake valve</div><div class="v" id="cut" style="font-size:16px">--</div></div>
+  <div class="tile" id="pcsTile"><div class="k">PCS</div><div class="v" id="pcs" style="font-size:16px">--</div></div>
+  <div class="tile"><div class="k">Speed</div><div class="v" id="speed">--</div></div>
+  <div class="tile"><div class="k">Sim time</div><div class="v" id="time" style="font-size:16px">--</div></div>
+</div>
+
+<main>
+  <div class="col">
+    <div class="card">
+      <h2>Pressure along the train</h2>
+      <canvas id="graph"></canvas>
+      <div class="legend"><span><i style="background:var(--pipe)"></i>Brake pipe</span><span><i style="background:var(--aux)"></i>Auxiliary reservoir</span>
+        <span><i style="background:var(--emg)"></i>Emergency reservoir</span><span><i style="background:var(--cyl)"></i>Brake cylinder</span>
+        <span id="trainInfo"></span></div>
+    </div>
+    <div class="card">
+      <h2>The train - brakes applied in orange; click a car for its details</h2>
+      <canvas id="cars"></canvas>
+      <div id="carInfo" class="muted" style="margin-top:6px">&nbsp;</div>
+    </div>
+    <div class="card">
+      <h2>Brake valve <span class="muted" id="standNote"></span></h2>
+      <div class="row pos" id="autoButtons">
+        <button data-a="Release">Release</button><button data-a="Minimum">Minimum</button><button data-a="Service">Service</button>
+        <button data-a="FullService">Full service</button><button data-a="Suppression">Suppression</button><button data-a="HandleOff">Handle off</button>
+        <button data-a="Emergency" class="danger">Emergency</button>
+      </div>
+      <div class="row"><label>Service zone <input type="range" id="svc" min="0" max="100" value="70"></label><span id="svcText" class="muted"></span></div>
+      <div class="row"><label>Independent <input type="range" id="ind" min="0" max="100" value="100"></label>
+        <button id="bail">Bail off (hold)</button><label>Cut-out <select id="cutSel"><option value="Out">OUT</option><option value="Frt">FRT</option><option value="Pass">PASS</option></select></label>
+        <label>Feed valve <input type="number" id="feed" min="40" max="120" value="90" style="width:70px"></label>
+        <button id="eotEmg" class="danger">EOT emergency</button></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card" id="trainerCard">
+      <h2>Air brake test trainer</h2>
+      <div id="trainerStart">
+        <div class="grid2">
+          <label>Procedure <select id="proc"></select></label>
+          <label>Mode <select id="mode"><option>Learn</option><option>Practice</option><option>Test</option></select></label>
+          <label>Student <input id="student" placeholder="Name"></label>
+          <label>Employee number <input id="studentNo"></label>
+          <label>Hidden faults <input type="number" id="rnd" min="0" max="6" value="2"></label>
+        </div>
+        <div class="row"><button class="primary" id="startTrainer">Start test</button><span class="muted" id="procInfo"></span></div>
+      </div>
+      <div id="trainerRun" hidden></div>
+    </div>
+
+    <div class="card">
+      <h2>Instructor: train</h2>
+      <div class="grid2">
+        <label>Locomotives <input type="number" id="locos" min="1" max="4" value="2"></label>
+        <label>Cars <input type="number" id="ncars" min="1" max="200" value="100"></label>
+        <label>Loaded share <input type="number" id="loaded" min="0" max="1" step="0.1" value="0.5"></label>
+        <label>Leakage (CFM) <input type="number" id="leak" min="0" max="200" value="15"></label>
+        <label title="Remote consists, each as car and units, either order - e.g. 50:1, rear:1 or 1:50, 1:100">DP remotes <input id="dp" placeholder="none, or e.g. 50:1, rear:1"></label>
+        <label title="Below freezing, hoses and cylinder packing cups leak more">Outside temp (°F) <input type="number" id="ambient" min="-60" max="120" value="60"></label>
+        <label title="Share of the cars whose valves have brake cylinder maintaining">BCM valves (%) <input type="number" id="bcm" min="0" max="100" value="0"></label>
+        <label title="Share of the cars whose brake cylinders have bad seals and leak; the rest hold tight">Bad cylinder seals (%) <input type="number" id="seals" min="0" max="100" value="0"></label>
+        <label title="How fast each bad seal leaks, CFM at 50 psi (0.2 is about 6 psi a minute); cold makes it worse">Seal leak (CFM) <input type="number" id="sealLeak" min="0" max="5" step="0.05" value="0.2"></label>
+      </div>
+      <div class="muted" id="dpText" style="margin-top:6px"></div>
+      <div class="row"><label><input type="checkbox" id="charged" checked style="width:auto"> Start charged</label>
+        <button class="primary" id="startSim">Start train</button><button id="chargeSim" title="Brake pipe and every car's reservoirs to the feed valve setting now, brakes released (not during a test)">Fully charge</button><button id="stopSim" class="danger">Stop</button></div>
+      <div id="dpPanel" hidden></div>
+      <div class="row"><span class="muted">Speed</span><span class="pos" id="speeds"><button data-s="1">1x</button><button data-s="2">2x</button><button data-s="5">5x</button><button data-s="10">10x</button></span>
+        <button id="pause">Pause</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Instructor: faults</h2>
+      <div class="grid2">
+        <label>Fault <select id="ftype">
+          <option value="carLeak">Leak at a car (CFM)</option><option value="trainLeakage">Train leakage (CFM)</option>
+          <option value="angleCock">Closed angle cock behind car</option><option value="kinkedHose">Restricted hose behind car</option>
+          <option value="cutOut">Cut-out car</option><option value="insensitive">Insensitive valve (psi)</option>
+          <option value="sticking">Sticking brake</option><option value="slowValve">Slow valve</option>
+          <option value="pistonTravel">Piston travel (in)</option><option value="retainer">Retainer set (1 HP, 2 LP, 3 SD)</option>
+          <option value="undesiredEmergency">Undesired emergency at car</option>
+          <option value="eotComm">EOT not communicating</option><option value="eotEmergency">EOT emergency fails</option>
+          <option value="cylinderLeak">Brake cylinder leak at a car (CFM)</option><option value="badSeals">Bad cylinder seals (% of cars)</option><option value="sealLeak">Bad seal leak rate (CFM)</option><option value="bcm">BCM on this car's valve</option><option value="bcmAll">BCM on every car</option>
+          <option value="ambient">Outside temperature (°F)</option><option value="dpCommLoss">DP remote lost communication (value = remote 1, 2...)</option>
+          <option value="feedValve">Feed valve (psi)</option><option value="grade">Grade (%)</option>
+          <optgroup label="Locomotives (choose the unit)">
+            <option value="muHose">MU hose behind unit parted (3, 13 or 20)</option><option value="mu2a">MU-2A in the wrong position</option>
+            <option value="locoBrakeValve">Brake valve cut wrong (trailing cut in)</option><option value="locoCylindersCutOut">Brake cylinders cut out</option>
+            <option value="deadEngineCock">Dead engine cut-out cock open</option><option value="compressorDead">Compressor dead</option>
+            <option value="mainReservoirLeak">Main reservoir leak (CFM)</option>
+          </optgroup>
+        </select></label>
+        <label>Car <select id="fcar"></select></label>
+        <label>Value <input type="number" id="fval" step="0.5"></label>
+        <label>&nbsp;<span class="row"><button id="fon" class="primary">Apply</button><button id="foff">Clear</button></span></label>
+      </div>
+      <div class="log" id="flog"></div>
+    </div>
+  </div>
+</main>
+
+<script src="shim.js"></script>
+<script src="common.js"></script>
+<script src="airbrake.js"></script>
+</body>
+</html>

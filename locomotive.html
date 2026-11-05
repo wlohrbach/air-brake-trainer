@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Locomotive and Car Air Rack</title>
+<link rel="stylesheet" href="site.css">
+<style>
+  /* Air systems, one color each (the same as the locomotive view mock-up). */
+  :root { --mr:#ff5b50; --bp:#f0b43a; --er:#4cc286; --ind:#a77df2; --act:#3cc7d7; --bc:#5c94ff; --ex:#7d8893; --aux:#ec7fd0; --em:#8fd14f; --comp:#202020; --dash:rgba(255,255,255,.9); }
+  #carSchem { display:block; width:100%; min-width:760px; max-width:1150px; height:auto; user-select:none; }
+  main { display:grid; gap:10px; padding:10px 16px; }
+  h2 { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin:0 0 8px; font-weight:600; }
+  .layerbar { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin-bottom:8px; }
+  .layerbar .grp { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .chip { display:inline-flex; gap:6px; align-items:center; border-radius:999px; padding:3px 10px 3px 7px; font-size:12px; }
+  .chip i { width:18px; height:6px; border-radius:3px; background:var(--c); display:inline-block; }
+  .chip.off { opacity:.45; }
+  .schem-wrap { overflow-x:auto; }
+  #schem { display:block; width:100%; min-width:900px; height:auto; user-select:none; }
+  .grid3 { display:grid; gap:10px; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.2fr); }
+  @media (max-width:1100px) { .grid3 { grid-template-columns:1fr; } }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .row + .row { margin-top:8px; }
+  .row label { flex-direction:row; align-items:center; gap:6px; }
+  input[type=range] { flex:1; min-width:140px; padding:0; }
+  button.on { background:#1d4f6b; border-color:#2a6d93; color:#fff; }
+  button.bad { border-color:#6a2a26; color:#ff9a90; background:#2b1715; }
+  .hold { width:100%; padding:9px; font-weight:600; margin-top:8px; }
+  .hold.down { background:#0f6f7a; border-color:#3cc7d7; color:#fff; }
+  table.cfg td, table.cfg th { padding:4px 6px; }
+  table.cfg td:first-child { color:var(--dim); }
+  table.cfg button { width:100%; padding:4px 6px; font-size:12px; }
+  .gauges { display:flex; flex-wrap:wrap; gap:8px; }
+  .gauge { display:grid; justify-items:center; gap:2px; flex:1; min-width:110px; }
+  .gauge svg { width:100%; max-width:130px; height:auto; }
+  .gauge .cap { font-size:12px; color:var(--dim); text-align:center; line-height:1.3; }
+  .gauge .cap b { color:var(--text); font-variant-numeric:tabular-nums; }
+  .warns div { background:#2b1715; color:#ff9a90; border-radius:5px; padding:6px 9px; font-size:13px; margin-bottom:6px; }
+  .now { margin:0; padding-left:18px; display:grid; gap:5px; font-size:13px; line-height:1.4; }
+  /* schematic */
+  .tube { fill:none; stroke-width:8; stroke-linecap:round; stroke-linejoin:round; }
+  .core { fill:none; stroke:var(--panel); stroke-width:4.4; stroke-linecap:round; stroke-linejoin:round; }
+  .fill { fill:none; stroke-width:4.4; stroke-linecap:round; stroke-linejoin:round; }
+  .dash { fill:none; stroke:var(--dash); stroke-width:1.8; stroke-dasharray:4 9; stroke-linecap:round; opacity:0; }
+  .lay { transition:opacity .25s; } .lay.off { opacity:.08; } .lay.off .dash { visibility:hidden; }
+  .box { fill:var(--comp); stroke:#7a858e; stroke-width:1.3; }
+  .frame { fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:2 4; }
+  .t { fill:var(--text); font-size:13px; font-weight:600; }
+  .ts { fill:var(--dim); font-size:10.5px; }
+  .tv { fill:var(--text); font-size:11px; font-family:Consolas, "Cascadia Mono", monospace; }
+  .tt { fill:var(--text); font-size:16px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  .hdl { transform-box:view-box; transition:transform .35s ease; }
+  .click { cursor:pointer; }
+  .click:hover .box, .click:hover .ring { stroke:var(--link); stroke-width:2; }
+  .ring { fill:var(--comp); stroke:#7a858e; stroke-width:1.4; }
+  .cockh { stroke-width:3.2; stroke-linecap:round; }
+  @media (prefers-reduced-motion: reduce) { .hdl, .lay { transition:none; } }
+</style>
+</head>
+<body data-feature="instruction">
+<header class="top"><h1>Locomotive and Car Air Rack</h1><span id="status" class="muted">Not running</span><div id="userbar"></div></header>
+
+<main>
+  <div class="card" id="noTrain" hidden>
+    <h2>No train is running</h2>
+    <div class="row"><label>Locomotives <input type="number" id="nLocos" min="1" max="6" value="2" style="width:70px"></label>
+      <label>Cars <input type="number" id="nCars" min="1" max="200" value="20" style="width:80px"></label>
+      <button class="primary" id="startTrain">Start train</button></div>
+  </div>
+
+  <section class="card" id="board">
+    <div class="layerbar"><div class="grp" id="layers"></div><div class="grp" id="presets"></div></div>
+    <div class="schem-wrap"><svg id="schem" role="img" aria-label="Piping schematic of the locomotive consist"></svg></div>
+    <div class="muted" style="margin-top:6px">Pipes fill with color as they charge; moving dashes show which way the air is going. Click a cut-out cock, an MU-2A valve or an MU hose to work it.</div>
+  </section>
+
+  <section class="card" id="carBoard">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Car brake system</h2>
+      <label class="muted">Car <select id="carPick"></select></label></div>
+    <div class="schem-wrap"><svg id="carSchem" viewBox="0 0 960 330" role="img" aria-label="Piping schematic of one freight car's air brake"></svg></div>
+    <div class="muted" style="margin-top:6px">The same car in the running train: brake pipe, control valve, combined reservoir and brake cylinder. Car faults (cut-out, retainer, angle cocks) are set on the Brake Pipe Propagation Simulator.</div>
+  </section>
+
+  <section class="grid3">
+    <div class="card">
+      <h2>Lead brake valve</h2>
+      <div class="row" id="autoSeg">
+        <button data-a="Release">Release</button><button data-a="Minimum">Minimum</button><button data-a="Service">Service</button>
+        <button data-a="FullService">Full service</button><button data-a="Emergency" class="danger">Emergency</button>
+      </div>
+      <div class="row"><label for="red">Service reduction</label><input type="range" id="red" min="6" max="26" step="1" value="10"><span id="redOut" class="muted">10 psi</span></div>
+      <div class="row"><label for="ind">Independent</label><input type="range" id="ind" min="0" max="100" value="100"><span id="indOut" class="muted">45 psi</span></div>
+      <button id="bail" class="hold">Bail off (hold)</button>
+      <div class="muted" style="margin-top:6px">A SimHogger stand drives these too when one is connected.</div>
+    </div>
+    <div class="card">
+      <h2>Consist setup</h2>
+      <div class="row" id="unitCount" style="margin-bottom:8px"></div>
+      <table class="cfg"><thead id="cfgHead"></thead><tbody id="cfgBody"></tbody></table>
+      <div class="row" id="quick" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>Gauges</h2>
+      <div class="gauges" id="gauges"></div>
+      <h2 style="margin-top:12px">What's happening</h2>
+      <div class="warns" id="warns"></div>
+      <ul class="now" id="now"></ul>
+    </div>
+  </section>
+</main>
+
+<script src="shim.js"></script>
+<script src="common.js"></script>
+<script src="locomotive.js"></script>
+</body>
+</html>
