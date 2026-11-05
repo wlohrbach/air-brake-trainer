@@ -1,10 +1,10 @@
 {
   "mainAssemblyName": "AirBrake.Web",
   "resources": {
-    "hash": "sha256-tKBrzYlnRHRqfqjWOx3V2d6T9hwn5h9zjPOfJ3Yvd0Y=",
+    "hash": "sha256-oYH6VbfYzO6yuuGj7qrhlOPLqz3ijH/q6I8egqIstTI=",
     "fingerprinting": {
-      "AirBrake.zryjammdi5.wasm": "AirBrake.wasm",
-      "AirBrake.Web.lvl1eprwny.wasm": "AirBrake.Web.wasm",
+      "AirBrake.p5x9kc9jzp.wasm": "AirBrake.wasm",
+      "AirBrake.Web.ymeb9wj200.wasm": "AirBrake.Web.wasm",
       "System.Collections.Concurrent.gi0zobgpzs.wasm": "System.Collections.Concurrent.wasm",
       "System.Collections.ejuvqxj0fz.wasm": "System.Collections.wasm",
       "System.Console.evc5suo5sp.wasm": "System.Console.wasm",
@@ -39,8 +39,8 @@
       "System.Runtime.InteropServices.JavaScript.8zb3httfq9.wasm": "sha256-ZDST8wdl5SpcDDfy0lQnZOX+W7O+1GP5FMOHNP4f9ko="
     },
     "assembly": {
-      "AirBrake.zryjammdi5.wasm": "sha256-zzijselO5tsiMgFu0T/M3v+x5LnkeKDZ34bDIUL8/4c=",
-      "AirBrake.Web.lvl1eprwny.wasm": "sha256-Aac/4E32lcR6HH6p/mjKB63oqfZR1k6lWk6+JZkYbnE=",
+      "AirBrake.p5x9kc9jzp.wasm": "sha256-HaR0XZg6fxdeUziyJy7LeAoGRFCvvTvcVsVq0m775dE=",
+      "AirBrake.Web.ymeb9wj200.wasm": "sha256-2vf9Zg2j0sNMOFIlCz8reFAAghcDChxmet1xKL6B3TI=",
       "System.Collections.Concurrent.gi0zobgpzs.wasm": "sha256-WFGtU2w0GQoCrQ3qbhLsNvDlUAomS/aLIVtd/te0srE=",
       "System.Collections.ejuvqxj0fz.wasm": "sha256-Wlq545MOuZscgvH1cPpmX5Me6YP3OCD7R7CnTHAijO0=",
       "System.Console.evc5suo5sp.wasm": "sha256-lpvO19QHK+fQiCiQb9M4xneqknQIG+ifukiiHEnSpss=",

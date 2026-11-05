@@ -57,3 +57,18 @@ async function requireUser() {
   if ($("signOut")) $("signOut").onclick = async e => { e.preventDefault(); await api("api/auth/logout", { method: "POST" }); location.href = "login.html"; };
   return u;
 }
+
+// A press-and-hold button (bail off): on() while held by mouse, finger or space bar, off() once when let go. The pointer is
+// captured so a finger drifting off the button doesn't let go early, and touch-action:none stops the page from turning the
+// hold into a scroll (which cancels it) or a long-press menu.
+function holdButton(el, on, off) {
+  let held = false;
+  const press = e => { e.preventDefault(); if (held) return; held = true; el.classList.add("down"); on(); };
+  const release = () => { if (!held) return; held = false; el.classList.remove("down"); off(); };
+  el.style.touchAction = "none";
+  el.addEventListener("pointerdown", e => { if (e.button > 0) return; el.setPointerCapture?.(e.pointerId); press(e); });
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture", "blur"]) el.addEventListener(ev, release);
+  el.addEventListener("contextmenu", e => e.preventDefault());
+  el.addEventListener("keydown", e => { if ((e.key === " " || e.key === "Enter") && !e.repeat) press(e); });
+  el.addEventListener("keyup", e => { if (e.key === " " || e.key === "Enter") release(); });
+}

@@ -45,11 +45,11 @@ function unitPipes(k) {
     P("ind", [[0, 135], [560, 135]], () => l().independentPipePsi, null),
     P("ind", [[222, 215], [270, 215]], () => lead() ? l().independentPipePsi : 0, () => f().independent),
     P("ind", [[315, 200], [315, 135]], () => l().independentPipePsi, () => f().independent),
-    P("ind", [[360, 235], [430, 235], [430, 270], [461, 270]], () => l().independentPipePsi, null),
+    P("ind", [[360, 235], [430, 235], [430, 270], [450, 270]], () => l().independentPipePsi, null),
     P("act", [[0, 158], [560, 158]], () => l().actuatingPipePsi, null),
     P("act", [[160, 185], [160, 158]], () => l().actuatingPipePsi, () => f().actuating),
     P("act", [[390, 158], [390, 420], [370, 420]], () => l().actuatingPipePsi, null),
-    P("bc", [[370, 380], [552, 380], [552, 270], [479, 270]], () => l().automaticPsi, null),
+    P("bc", [[370, 380], [552, 380], [552, 270], [490, 270]], () => l().automaticPsi, null),
     P("bc", [[470, 279], [470, 300]], () => Math.max(l().automaticPsi, l().independentPipePsi), null),
     P("bc", [[470, 360], [470, 462]], () => l().brakeCylinderPsi, () => f().relay),
     P("bc", [[470, 478], [470, 490]], () => l().brakeCylinderPsi, () => f().relay),
@@ -107,7 +107,11 @@ function unitSvg(k) {
   g.push(`<rect class="box" x="8" y="372" width="92" height="56" rx="8"/><text class="t" x="16" y="389">Equalizing</text><text class="ts" x="16" y="403">reservoir</text><text class="tv" x="16" y="419" id="erT${k}"></text>`);
   g.push(`<g class="click" id="mu${k}" tabindex="0" role="button" aria-label="MU-2A valve, unit ${k + 1}"><title>MU-2A valve: click to turn</title><rect class="box" x="270" y="198" width="90" height="56" rx="5"/><text class="t" x="280" y="215">MU-2A</text><text class="tv" x="280" y="232" id="muT${k}"></text><text class="ts" x="280" y="247">click to turn</text></g>`);
   g.push(`<rect class="box" x="260" y="360" width="110" height="80" rx="5"/><text class="t" x="268" y="378">26-F control</text><text class="t" x="268" y="392">valve</text><text class="tv" x="268" y="410" id="cvT${k}"></text><text class="ts" x="268" y="428" id="cvS${k}"></text>`);
-  g.push(`<circle class="ring" cx="470" cy="270" r="9"/><text class="ts" x="467" y="256" text-anchor="middle" style="font-size:10px">double check</text>`);
+  // Double check valve: the shuttle is pushed away from the higher pressure and seals the other inlet, so the relay valve
+  // is piloted by whichever of the automatic (26-F, right) and the independent (#20, left) asks for more.
+  g.push(`<g><title>Double check valve: the shuttle seals off the lower of the automatic and the independent</title>` +
+    `<rect class="ring" x="450" y="261" width="40" height="18" rx="9"/><line x1="459" y1="263" x2="459" y2="277" stroke="#7a858e" stroke-width="1"/><line x1="481" y1="263" x2="481" y2="277" stroke="#7a858e" stroke-width="1"/>` +
+    `<circle class="shuttle" id="dcv${k}" cx="470" cy="270" r="6" fill="#7a858e"/></g><text class="ts" x="470" y="254" text-anchor="middle" style="font-size:10px">double check</text>`);
   g.push(`<rect class="box" x="414" y="300" width="112" height="60" rx="5"/><text class="t" x="424" y="323" id="rvN${k}">J-1 relay valve</text><text class="tv" x="424" y="346" id="ctlT${k}"></text><text class="ts" x="530" y="337">EX</text>`);
   g.push(`<line id="rodL${k}" x1="400" y1="513" x2="394" y2="513" stroke="var(--text)" stroke-width="3.5" stroke-linecap="round"/><rect class="box" x="400" y="500" width="60" height="26" rx="4"/>`);
   g.push(`<line id="rodR${k}" x1="540" y1="513" x2="546" y2="513" stroke="var(--text)" stroke-width="3.5" stroke-linecap="round"/><rect class="box" x="480" y="500" width="60" height="26" rx="4"/>`);
@@ -421,7 +425,11 @@ function narrate() {
     ls.forEach((l, k) => { if (l.relayValve === "J1_6_16" && l.independentPipePsi > 2) n.push(`Unit ${k + 1}'s J-1.6-16 relay valve turns ${r(l.independentPipePsi)} psi on #20 into ${r(l.relayTargetPsi)} psi in its cylinders (1.6 : 1).`); });
   }
   else if (f.independent < -1) n.push("The independent is releasing: #20 exhausts through the lead brake valve.");
-  if (lead.actuatingPipePsi > 15) n.push(`Bail off: the #13 actuating pipe is charged (${r(lead.actuatingPipePsi)} psi) and the control valves drop their automatic application.`);
+  if (lead.actuatingPipePsi > 15) {
+    // First in the list while it's held, so it isn't cut off below the other lines.
+    n.unshift(`Bail off: the #13 actuating pipe is charged (${r(lead.actuatingPipePsi)} psi) and the control valves drop their automatic application.` +
+      (lead.independentPipePsi > 2 ? ` The independent is still applied (${r(lead.independentPipePsi)} psi on #20), so the cylinders stay at what it asks for - bail off releases only the automatic.` : ""));
+  }
   ls.forEach((l, k) => { if (l.flows.deadEngine > 0.5) n.push(`Dead engine: brake pipe air passes the choke and check valve into unit ${k + 1}'s main reservoirs (${r(l.mainReservoirPsi)} psi).`); });
   if (ls.some(l => l.compressorRunning)) n.push("Compressors are pumping the main reservoirs up (cut out at 140 psi).");
   $("warns").innerHTML = w.map(x => `<div>${esc(x)}</div>`).join("");
@@ -456,6 +464,11 @@ function render() {
     const a = k === 0 && l.automatic === "Service" ? AUTO_ANG.Minimum + (v.reductionPsi - 6) / 20 * (AUTO_ANG.FullService - AUTO_ANG.Minimum) : (AUTO_ANG[l.automatic] ?? -130);
     $(`auto${k}`).style.transform = `rotate(${a}deg)`;
     $(`indh${k}`).style.transform = `rotate(${-130 + l.independent * 260}deg)` + (l.bailOff ? " scale(.82)" : "");
+    // Shuttle to the right (sealing the automatic) when the independent is higher, to the left when the automatic is.
+    const side = l.independentPipePsi > l.automaticPsi + 0.5 ? 1 : l.automaticPsi > l.independentPipePsi + 0.5 ? -1 : 0;
+    const dcv = $(`dcv${k}`);
+    dcv.style.transform = `translateX(${side * 11}px)`;
+    dcv.setAttribute("fill", side > 0 ? "var(--ind)" : side < 0 ? "var(--bc)" : "#7a858e");
     const travel = Math.max(0, Math.min(1, (l.brakeCylinderPsi - 3) / 20)) * 16 + 4;
     $(`rodL${k}`).setAttribute("x2", 400 - travel); $(`rodR${k}`).setAttribute("x2", 540 + travel);
   });
@@ -538,13 +551,7 @@ function showIndependent(fraction) {
   $("indOut").textContent = kinds.length === 1 && kinds[0][1] === 1 ? `${r(p20)} psi`
     : `#20 ${r(p20)} psi · BC ` + kinds.map(([name, ratio]) => `${r(p20 * ratio)}` + (kinds.length > 1 ? ` (${name})` : "")).join(" / ") + " psi";
 }
-const bail = $("bail");
-const down = e => { e.preventDefault(); bail.classList.add("down"); control({ bailOff: true }); };
-const up = () => { if (!bail.classList.contains("down")) return; bail.classList.remove("down"); control({ bailOff: false }); };
-bail.addEventListener("pointerdown", down);
-for (const ev of ["pointerup", "pointerleave", "pointercancel", "blur"]) bail.addEventListener(ev, up);
-bail.addEventListener("keydown", e => { if (e.key === " " && !e.repeat) down(e); });
-bail.addEventListener("keyup", e => { if (e.key === " ") up(); });
+holdButton($("bail"), () => control({ bailOff: true }), () => control({ bailOff: false }));
 $("startTrain").onclick = () => post("start", { locomotives: +$("nLocos").value, cars: +$("nCars").value, startCharged: true, trainLeakageScfm: 10, loadedShare: 0.5, feedValvePsi: 90 });
 
 const conn = new signalR.HubConnectionBuilder().withUrl("hub/train").withAutomaticReconnect([0, 1000, 2000, 5000, 5000]).build();

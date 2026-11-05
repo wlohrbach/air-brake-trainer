@@ -119,8 +119,7 @@ $("svc").oninput = () => {
 $("svc").onchange = () => post("control", { automatic: "Service", serviceFraction: +$("svc").value / 100 });
 $("svc").oninput();
 $("ind").onchange = () => post("control", { independent: +$("ind").value / 100 });
-$("bail").onmousedown = () => post("control", { bailOff: true });
-$("bail").onmouseup = $("bail").onmouseleave = () => view?.bailOff && post("control", { bailOff: false });
+holdButton($("bail"), () => post("control", { bailOff: true }), () => post("control", { bailOff: false }));
 $("cutSel").onchange = () => post("control", { cutOut: $("cutSel").value });
 $("feed").onchange = () => post("control", { feedValvePsi: +$("feed").value });
 $("eotEmg").onclick = () => post("control", { eotEmergency: true });
