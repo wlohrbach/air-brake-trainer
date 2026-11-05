@@ -436,7 +436,7 @@ function render() {
   // brake valve card
   for (const b of $("autoSeg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.a === v.automatic);
   if (document.activeElement !== $("ind")) $("ind").value = Math.round(v.independent * 100);
-  $("indOut").textContent = `${Math.round(v.independent * 45)} psi`;
+  showIndependent(+$("ind").value / 100);
   if (v.automatic === "Service" && document.activeElement !== $("red")) { $("red").value = Math.round(v.reductionPsi); }
   $("redOut").textContent = `${$("red").value} psi`;
   narrate();
@@ -496,7 +496,17 @@ for (const b of $("autoSeg").querySelectorAll("button"))
   b.onclick = () => control({ automatic: b.dataset.a, serviceFraction: (+$("red").value - 6) / 20 });
 $("red").oninput = () => { $("redOut").textContent = `${$("red").value} psi`; };
 $("red").onchange = () => control({ automatic: "Service", serviceFraction: (+$("red").value - 6) / 20 });
+$("ind").oninput = () => showIndependent(+$("ind").value / 100);
 $("ind").onchange = () => control({ independent: +$("ind").value / 100 });
+// The independent sets #20 (45 psi at full); each unit's relay valve turns that into its cylinder pressure, 1 : 1 on a
+// J-1 and 1.6 : 1 on a J-1.6-16 (45 on #20 = 72 in the cylinders).
+const IND_FULL_PSI = 45, RELAY = { J1: ["J-1", 1], J1_6_16: ["J-1.6-16", 1.6] };
+function showIndependent(fraction) {
+  const p20 = fraction * IND_FULL_PSI, r = Math.round;
+  const kinds = [...new Set(view.locomotives.map(l => l.relayValve))].map(k => RELAY[k] ?? RELAY.J1);
+  $("indOut").textContent = kinds.length === 1 && kinds[0][1] === 1 ? `${r(p20)} psi`
+    : `#20 ${r(p20)} psi · BC ` + kinds.map(([name, ratio]) => `${r(p20 * ratio)}` + (kinds.length > 1 ? ` (${name})` : "")).join(" / ") + " psi";
+}
 const bail = $("bail");
 const down = e => { e.preventDefault(); bail.classList.add("down"); control({ bailOff: true }); };
 const up = () => { if (!bail.classList.contains("down")) return; bail.classList.remove("down"); control({ bailOff: false }); };
