@@ -72,3 +72,74 @@ function holdButton(el, on, off) {
   el.addEventListener("keydown", e => { if ((e.key === " " || e.key === "Enter") && !e.repeat) press(e); });
   el.addEventListener("keyup", e => { if (e.key === " " || e.key === "Enter") release(); });
 }
+
+// The automatic brake handle as one slider, 0 (release) to 100 (emergency), with the 26L's stops marked. Between minimum
+// and full service is the service zone; past full service the handle carries on into an over-reduction (down to 50 psi,
+// LocoTuning.OverReductionMaxPsi) before the suppression, handle off and emergency stops. Release, minimum, suppression,
+// handle off and emergency are detents: let go near one and the handle drops into it.
+const AUTO = { min: 8, full: 52, over: 72, supp: 80, off: 89, minPsi: 6, fullPsi: 26, overPsi: 50 };
+const AUTO_MARKS = [[0, "Rel", "Release"], [AUTO.min, "Min", "Minimum"], [AUTO.full, "Full", "Full service"],
+  [AUTO.supp, "Sup", "Suppression"], [AUTO.off, "Off", "Handle off"], [100, "Emer", "Emergency"]];
+
+function autoFromHandle(x) {
+  if (x < 4) return { automatic: "Release", at: 0 };
+  if (x < AUTO.min + 1) return { automatic: "Minimum", at: AUTO.min };
+  if (Math.abs(x - AUTO.full) < 1) return { automatic: "FullService", at: AUTO.full, psi: AUTO.fullPsi };
+  if (x < AUTO.over + 4) {
+    x = Math.min(x, AUTO.over);
+    const psi = x <= AUTO.full ? AUTO.minPsi + (x - AUTO.min) / (AUTO.full - AUTO.min) * (AUTO.fullPsi - AUTO.minPsi)
+      : AUTO.fullPsi + (x - AUTO.full) / (AUTO.over - AUTO.full) * (AUTO.overPsi - AUTO.fullPsi);
+    return { automatic: "Service", serviceFraction: (psi - AUTO.minPsi) / (AUTO.fullPsi - AUTO.minPsi), psi, at: x };
+  }
+  if (x < 85) return { automatic: "Suppression", at: AUTO.supp };
+  if (x < 95) return { automatic: "HandleOff", at: AUTO.off };
+  return { automatic: "Emergency", at: 100 };
+}
+
+function handleFromView(automatic, psi) {
+  switch (automatic) {
+    case "Release": return 0;
+    case "Minimum": return AUTO.min;
+    case "FullService": return AUTO.full;
+    case "Suppression": return AUTO.supp;
+    case "HandleOff": return AUTO.off;
+    case "Emergency": return 100;
+  }
+  return psi <= AUTO.fullPsi ? AUTO.min + (psi - AUTO.minPsi) / (AUTO.fullPsi - AUTO.minPsi) * (AUTO.full - AUTO.min)
+    : AUTO.full + (psi - AUTO.fullPsi) / (AUTO.overPsi - AUTO.fullPsi) * (AUTO.over - AUTO.full);
+}
+
+const autoText = h => h.automatic === "Service"
+  ? (h.psi > AUTO.fullPsi + 0.5 ? `Over-reduction, ${Math.round(h.psi)} psi` : `Service, ${Math.round(h.psi)} psi`)
+  : h.automatic === "FullService" ? `Full service, ${AUTO.fullPsi} psi` : ({ HandleOff: "Handle off" }[h.automatic] || h.automatic);
+
+/** Builds the handle in <paramref name="el"/>; send(control) posts a move. Returns update(view) for the page's refresh. */
+function autoHandle(el, send) {
+  // Where a mark sits over the slider: the thumb (16 px) travels one thumb short of the track.
+  const at = p => `calc(${p}% + ${8 - p * 0.16}px)`;
+  const band = (from, to, cls) => `<span class="band ${cls}" style="left:${at(from)};width:calc(${to - from}% - ${(to - from) * 0.16}px)"></span>`;
+  el.classList.add("autoh");
+  el.innerHTML = `<div class="head"><span>Automatic</span><span class="out muted"></span></div>
+    <input type="range" min="0" max="100" step="0.5" value="0" aria-label="Automatic brake handle">
+    <div class="marks">${band(AUTO.min, AUTO.full, "svc")}${band(AUTO.full, AUTO.over, "over")}${band(95, 100, "emer")}
+      ${AUTO_MARKS.map(([p, s, name], i) => `<span class="mark${i % 2 ? " low" : ""}" data-p="${p}" title="${name}" style="left:${at(p)}">${s}</span>`).join("")}</div>`;
+  const input = el.querySelector("input"), out = el.querySelector(".out");
+  let busy = 0;   // while dragging, and a moment after a move, the page's refresh doesn't fight the hand
+  const show = h => { out.textContent = autoText(h); out.classList.toggle("warn", h.psi > AUTO.fullPsi + 0.5 || h.automatic === "Emergency"); };
+  const move = x => {
+    const h = autoFromHandle(x);
+    input.value = h.at;
+    show(h);
+    busy = Date.now() + 1500;
+    send({ automatic: h.automatic, serviceFraction: h.serviceFraction ?? 0 });
+  };
+  input.addEventListener("pointerdown", () => busy = Infinity);
+  input.oninput = () => { busy = Infinity; show(autoFromHandle(+input.value)); };
+  input.onchange = () => move(+input.value);
+  for (const m of el.querySelectorAll(".mark")) m.onclick = () => move(+m.dataset.p);
+  return v => {
+    if (Date.now() < busy) return;
+    input.value = handleFromView(v.automatic, v.reductionPsi);
+    show({ automatic: v.automatic, psi: v.reductionPsi });
+  };
+}

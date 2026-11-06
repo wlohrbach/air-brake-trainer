@@ -75,12 +75,7 @@
     </div>
     <div class="card">
       <h2>Brake valve <span class="muted" id="standNote"></span></h2>
-      <div class="row pos" id="autoButtons">
-        <button data-a="Release">Release</button><button data-a="Minimum">Minimum</button><button data-a="Service">Service</button>
-        <button data-a="FullService">Full service</button><button data-a="Suppression">Suppression</button><button data-a="HandleOff">Handle off</button>
-        <button data-a="Emergency" class="danger">Emergency</button>
-      </div>
-      <div class="row"><label>Service zone <input type="range" id="svc" min="0" max="100" value="70"></label><span id="svcText" class="muted"></span></div>
+      <div id="autoHandle"></div>
       <div class="row"><label>Independent <input type="range" id="ind" min="0" max="100" value="100"></label>
         <button id="bail">Bail off (hold)</button><label>Cut-out <select id="cutSel"><option value="Out">OUT</option><option value="Frt">FRT</option><option value="Pass">PASS</option></select></label>
         <label>Feed valve <input type="number" id="feed" min="40" max="120" value="90" style="width:70px"></label>

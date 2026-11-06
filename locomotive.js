@@ -416,6 +416,8 @@ function narrate() {
   });
   const f = lead.flows;
   if (lead.automatic === "Emergency") n.push("Emergency: the brake valve vents the brake pipe straight to atmosphere.");
+  else if (lead.automatic === "Service" && view.reductionPsi > 26.5)
+    n.push(`Over-reduction: ${r(view.reductionPsi)} psi asked for, past full service. Once the brake pipe is below equalization the car valves put no more air in the cylinders - the reservoirs just lose air that has to be pumped back before the next release.`);
   else if (f.brakePipe > 5) n.push(`The lead relay valve is charging the brake pipe from the main reservoirs (${r(lead.brakePipePsi)} psi, heading for the equalizing reservoir at ${r(lead.equalizingPsi)}).`);
   else if (f.brakePipe < -5) n.push(`The brake pipe is exhausting at the lead brake valve down to the equalizing reservoir (${r(lead.equalizingPsi)} psi).`);
   else if (lead.brakeValveCutIn) n.push(`Brake pipe is holding at ${r(lead.brakePipePsi)} psi; the relay valve feeds just enough to make up leakage (${r(view.flowScfm)} CFM).`);
@@ -461,7 +463,9 @@ function render() {
     $(`t20${k}`).textContent = Math.round(l.independentPipePsi); $(`t13${k}`).textContent = Math.round(l.actuatingPipePsi); $(`tbp${k}`).textContent = Math.round(l.brakePipePsi);
     $(`comp${k}`).textContent = l.compressorDead ? "dead" : l.compressorRunning ? "running" : "off";
     cock(`ckbv${k}`, l.brakeValveCutIn); cock(`ckde${k}`, l.deadEngineCutOutOpen); cock(`ckbc${k}`, !l.brakeCylindersCutOut);
-    const a = k === 0 && l.automatic === "Service" ? AUTO_ANG.Minimum + (v.reductionPsi - 6) / 20 * (AUTO_ANG.FullService - AUTO_ANG.Minimum) : (AUTO_ANG[l.automatic] ?? -130);
+    // Over-reduction carries the handle on past full service, short of suppression.
+    const a = k === 0 && l.automatic === "Service" ? (v.reductionPsi <= 26 ? AUTO_ANG.Minimum + (v.reductionPsi - 6) / 20 * (AUTO_ANG.FullService - AUTO_ANG.Minimum)
+      : AUTO_ANG.FullService + (v.reductionPsi - 26) / 24 * 0.75 * (AUTO_ANG.Suppression - AUTO_ANG.FullService)) : (AUTO_ANG[l.automatic] ?? -130);
     $(`auto${k}`).style.transform = `rotate(${a}deg)`;
     $(`indh${k}`).style.transform = `rotate(${-130 + l.independent * 260}deg)` + (l.bailOff ? " scale(.82)" : "");
     // Shuttle to the right (sealing the automatic) when the independent is higher, to the left when the automatic is.
@@ -478,11 +482,9 @@ function render() {
     $(g.id + s + "v").textContent = Math.round(val);
   }
   // brake valve card
-  for (const b of $("autoSeg").querySelectorAll("button")) b.classList.toggle("on", b.dataset.a === v.automatic);
+  showHandle(v);
   if (document.activeElement !== $("ind")) $("ind").value = Math.round(v.independent * 100);
   showIndependent(+$("ind").value / 100);
-  if (v.automatic === "Service" && document.activeElement !== $("red")) { $("red").value = Math.round(v.reductionPsi); }
-  $("redOut").textContent = `${$("red").value} psi`;
   narrate();
 }
 function cock(id, open) {
@@ -536,10 +538,7 @@ for (const [k, n] of Object.entries(SYS)) {
 for (const [n, list] of Object.entries(PRESETS)) {
   const b = document.createElement("button"); b.textContent = n; b.onclick = () => { for (const k of Object.keys(SYS)) setLayer(k, list.includes(k)); }; $("presets").appendChild(b);
 }
-for (const b of $("autoSeg").querySelectorAll("button"))
-  b.onclick = () => control({ automatic: b.dataset.a, serviceFraction: (+$("red").value - 6) / 20 });
-$("red").oninput = () => { $("redOut").textContent = `${$("red").value} psi`; };
-$("red").onchange = () => control({ automatic: "Service", serviceFraction: (+$("red").value - 6) / 20 });
+const showHandle = autoHandle($("autoHandle"), control);
 $("ind").oninput = () => showIndependent(+$("ind").value / 100);
 $("ind").onchange = () => control({ independent: +$("ind").value / 100 });
 // The independent sets #20 (45 psi at full); each unit's relay valve turns that into its cylinder pressure, 1 : 1 on a

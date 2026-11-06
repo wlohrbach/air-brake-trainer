@@ -32,7 +32,7 @@ function render() {
   renderDp(v);
   if (document.activeElement !== $("cutSel")) $("cutSel").value = v.cutOut;
   $("bail").classList.toggle("on", v.bailOff);
-  document.querySelectorAll("#autoButtons button").forEach(b => b.classList.toggle("on", b.dataset.a === v.automatic));
+  showHandle(v);
   document.querySelectorAll("#speeds button").forEach(b => b.classList.toggle("on", +b.dataset.s === v.speedFactor));
   $("pause").classList.toggle("on", v.paused);
   if (document.activeElement !== $("feed")) $("feed").value = v.feedValvePsi;
@@ -110,14 +110,7 @@ function fillCars() {
 
 // ---- brake valve ------------------------------------------------------------------------------------------------
 
-document.querySelectorAll("#autoButtons button").forEach(b => b.onclick = () =>
-  post("control", { automatic: b.dataset.a, serviceFraction: +$("svc").value / 100 }));
-$("svc").oninput = () => {
-  const red = 6 + (+$("svc").value / 100) * 20;
-  $("svcText").textContent = `${red.toFixed(1)} psi reduction`;
-};
-$("svc").onchange = () => post("control", { automatic: "Service", serviceFraction: +$("svc").value / 100 });
-$("svc").oninput();
+const showHandle = autoHandle($("autoHandle"), c => post("control", c));
 $("ind").onchange = () => post("control", { independent: +$("ind").value / 100 });
 holdButton($("bail"), () => post("control", { bailOff: true }), () => post("control", { bailOff: false }));
 $("cutSel").onchange = () => post("control", { cutOut: $("cutSel").value });

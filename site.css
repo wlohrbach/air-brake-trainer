@@ -31,3 +31,14 @@ dialog::backdrop { background:rgba(0,0,0,.6); }
 dialog h2 { margin:0 0 12px; font-size:16px; }
 dialog form { display:flex; flex-direction:column; gap:10px; }
 .btnrow { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; }
+/* The automatic brake handle (common.js autoHandle). */
+.autoh { display:grid; gap:2px; min-width:0; }
+.autoh .head { display:flex; justify-content:space-between; gap:8px; font-size:13px; }
+.autoh .out.warn { color:var(--warn); }
+.autoh input[type=range] { width:100%; margin:0; padding:0; border:0; background:none; accent-color:var(--link); }
+.autoh .marks { position:relative; height:34px; }
+.autoh .band { position:absolute; top:0; height:4px; border-radius:2px; }
+.autoh .band.svc { background:#2a6d93; } .autoh .band.over { background:var(--warn); } .autoh .band.emer { background:var(--bad); }
+.autoh .mark { position:absolute; top:6px; transform:translateX(-50%); font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; user-select:none; }
+.autoh .mark.low { top:19px; }
+.autoh .mark:hover { color:var(--text); }
